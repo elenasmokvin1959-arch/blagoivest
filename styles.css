@@ -701,6 +701,84 @@ h2 {
   display: block;
 }
 
+.payment-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, .62);
+}
+
+.payment-modal[hidden] {
+  display: none;
+}
+
+.payment-card {
+  position: relative;
+  width: min(100%, 430px);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.payment-card .eyebrow {
+  color: var(--red);
+}
+
+.payment-card p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.payment-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.payment-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.payment-options button {
+  min-height: 52px;
+  border-radius: 8px;
+  background: var(--black);
+  color: #fff;
+  font-weight: 900;
+}
+
+.payment-result {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.payment-result a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font-weight: 900;
+  text-decoration: none;
+}
+
 @media (min-width: 481px) {
   body {
     display: grid;
