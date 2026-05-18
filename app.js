@@ -625,6 +625,15 @@ function claimIncome() {
 }
 
 function withdraw() {
+  if (!state.activeLevel) {
+    toast("Вывод доступен только после покупки уровня");
+    setScreen("levels");
+    return;
+  }
+  if (!isBusinessDay()) {
+    toast("Заявки на вывод доступны с понедельника по пятницу");
+    return;
+  }
   const network = els.withdrawNetwork.value;
   const address = state.wallets?.[network] || "";
   if (!address) {
@@ -639,6 +648,10 @@ function withdraw() {
   const amount = Number(els.withdrawAmount.value);
   if (!Number.isFinite(amount) || amount <= 0) {
     toast("Введите сумму вывода");
+    return;
+  }
+  if (amount < 5) {
+    toast("Минимальная сумма вывода $5");
     return;
   }
   if (amount > state.balance) {
