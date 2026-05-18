@@ -554,25 +554,24 @@ function getActiveDaily() {
 
 function updateTimer() {
   if (!state.cycleEndsAt) {
-    els.timerValue.textContent = "05:00:00";
+    els.timerValue.textContent = "24:00:00";
     els.timerStatus.textContent = state.activeLevel
-      ? "Нажмите старт, чтобы запустить 5-часовой ежедневный цикл."
+      ? "Нажмите старт: доход сразу начислится в ожидание, следующий запуск будет через 24 часа."
       : "Купите уровень, чтобы запустить ежедневный цикл.";
+    els.startBlago.disabled = !state.activeLevel;
     return;
   }
 
   const left = state.cycleEndsAt - Date.now();
   if (left <= 0) {
+    state.cycleEndsAt = 0;
     if (!state.cycleReady) {
-      const amount = getActiveDaily();
       state.cycleReady = true;
-      state.pending += amount;
-      addHistory("BLAGO готов", `Начислено ${money(amount)}. Нажмите оранжевую кнопку, чтобы забрать доход.`);
       saveState();
-      renderIncome();
     }
-    els.timerValue.textContent = "00:00:00";
-    els.timerStatus.textContent = "Доход готов к получению.";
+    els.timerValue.textContent = "24:00:00";
+    els.timerStatus.textContent = "Можно снова нажать старт и начислить следующий ежедневный доход.";
+    els.startBlago.disabled = false;
     return;
   }
 
@@ -581,7 +580,8 @@ function updateTimer() {
   const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
   const seconds = String(total % 60).padStart(2, "0");
   els.timerValue.textContent = `${hours}:${minutes}:${seconds}`;
-  els.timerStatus.textContent = "Идет обратный отсчет. После завершения доход появится во вкладке дохода.";
+  els.timerStatus.textContent = "До следующего запуска BLAGO. Накопленный доход можно забрать кнопкой ниже.";
+  els.startBlago.disabled = true;
 }
 
 function startBlago() {
@@ -594,17 +594,19 @@ function startBlago() {
     toast("BLAGO запускается с понедельника по пятницу");
     return;
   }
-  if (state.lastStartDate === todayKey()) {
-    toast("Сегодня цикл уже запускался");
+  if (state.cycleEndsAt && state.cycleEndsAt > Date.now()) {
+    toast("Следующий старт будет доступен после 24 часов");
     return;
   }
-  state.cycleEndsAt = Date.now() + 5 * 60 * 60 * 1000;
+  const amount = getActiveDaily();
+  state.pending = Number((state.pending + amount).toFixed(2));
+  state.cycleEndsAt = Date.now() + 24 * 60 * 60 * 1000;
   state.cycleReady = false;
   state.lastStartDate = todayKey();
-  addHistory("BLAGO запущен", "Начался 5-часовой обратный отсчет ежедневного дохода.");
+  addHistory("BLAGO начислен", `${money(amount)} добавлены в ожидающий доход. Следующий старт доступен через 24 часа.`);
   saveState();
   render();
-  toast("BLAGO запущен на 5 часов");
+  toast(`${money(amount)} начислены, заберите доход`);
 }
 
 function claimIncome() {
@@ -613,11 +615,9 @@ function claimIncome() {
     return;
   }
   const amount = state.pending;
-  state.balance += amount;
-  state.totalIncome += amount;
+  state.balance = Number((state.balance + amount).toFixed(2));
+  state.totalIncome = Number((state.totalIncome + amount).toFixed(2));
   state.pending = 0;
-  state.cycleReady = false;
-  state.cycleEndsAt = 0;
   addHistory("Доход получен", `${money(amount)} зачислены на баланс.`);
   saveState();
   render();
