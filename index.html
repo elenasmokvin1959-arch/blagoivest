@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Crypto Invest SRL</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="auth-locked">
+  <section class="auth-screen" id="authScreen" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <p class="eyebrow">Crypto Invest SRL</p>
+      <h1 id="authTitle">BLAGO Finance</h1>
+      <p class="auth-copy">Войдите по номеру телефона или создайте новый аккаунт. При регистрации уровень не выдается.</p>
+
+      <div class="auth-tabs" role="tablist">
+        <button class="is-active" data-auth-mode="login" type="button">Вход</button>
+        <button data-auth-mode="register" type="button">Регистрация</button>
+      </div>
+
+      <form class="auth-form" id="authForm">
+        <label class="register-only">
+          Имя
+          <input name="name" maxlength="40" autocomplete="name" placeholder="Ваше имя">
+        </label>
+
+        <div class="phone-row">
+          <label>
+            Код
+            <select name="countryCode" id="countryCode"></select>
+          </label>
+          <label>
+            Телефон
+            <input name="phone" required inputmode="tel" autocomplete="tel" placeholder="699 00 000">
+          </label>
+        </div>
+
+        <label>
+          Пароль
+          <input name="password" required minlength="4" maxlength="48" type="password" autocomplete="current-password" placeholder="Минимум 4 символа">
+        </label>
+
+        <label class="register-only">
+          Подтвердить пароль
+          <input name="passwordConfirm" minlength="4" maxlength="48" type="password" autocomplete="new-password" placeholder="Повторите пароль">
+        </label>
+
+        <p class="auth-error" id="authError" role="alert"></p>
+        <button class="primary-btn" id="authSubmit" type="submit">Войти</button>
+      </form>
+    </div>
+  </section>
+
+  <main class="phone-app">
+    <header class="hero">
+      <div class="hero__top">
+        <div>
+          <p class="eyebrow">Crypto Invest SRL</p>
+          <h1>BLAGO Finance</h1>
+        </div>
+        <button class="icon-btn" id="themeToggle" type="button" aria-label="Сменить тему">◐</button>
+      </div>
+      <div class="balance-card">
+        <span>Баланс</span>
+        <strong id="balanceValue">$0.00</strong>
+        <small id="activeLevelText">Уровень не приобретен</small>
+      </div>
+    </header>
+
+    <section class="screen is-active" id="homeScreen">
+      <div class="notice">
+        <span>Важно</span>
+        <p>Зарегистрируйтесь, выберите уровень, запускайте BLAGO каждые 24 часа с понедельника по пятницу и забирайте начисленный доход после обратного отсчета.</p>
+      </div>
+      <div class="quick-grid">
+        <button class="quick-card" data-nav="levels" type="button">
+          <strong>Уровни</strong>
+          <span>7 пакетов</span>
+        </button>
+        <button class="quick-card quick-card--blago" data-nav="blago" type="button">
+          <strong>BLAGO</strong>
+          <span>Доход дня</span>
+        </button>
+        <button class="quick-card" data-nav="income" type="button">
+          <strong>Доход</strong>
+          <span>Заявки и история</span>
+        </button>
+        <button class="quick-card" data-nav="share" type="button">
+          <strong>Рефералы</strong>
+          <span>Ссылка</span>
+        </button>
+        <button class="quick-card" data-nav="profile" type="button">
+          <strong>Профиль</strong>
+          <span>Данные и кошельки</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="screen" id="levelsScreen">
+      <div class="section-head">
+        <h2>Уровни продаж</h2>
+        <p>Новый аккаунт стартует без уровня. После покупки высокого уровня предыдущие становятся закрытыми.</p>
+      </div>
+      <div class="level-list" id="levelList"></div>
+    </section>
+
+    <section class="screen" id="blagoScreen">
+      <div class="blago-card">
+        <p class="eyebrow">доступный уровень</p>
+        <h2 id="blagoLevel">Уровень не выбран</h2>
+        <div class="timer" id="timerValue">05:00:00</div>
+        <p id="timerStatus">Купите уровень, чтобы запустить ежедневный цикл.</p>
+        <button class="primary-btn" id="startBlago" type="button">Старт</button>
+      </div>
+      <button class="claim-btn" id="claimIncome" type="button">
+        <span>$</span>
+        <strong>Забрать доход</strong>
+      </button>
+    </section>
+
+    <section class="screen" id="incomeScreen">
+      <div class="section-head">
+        <h2>Доход</h2>
+        <p>Начисления, заявки на вывод и командные бонусы.</p>
+      </div>
+      <div class="stats-grid">
+        <div><span>Всего</span><strong id="totalIncome">$0.00</strong></div>
+        <div><span>Ожидает</span><strong id="pendingIncome">$0.00</strong></div>
+      </div>
+      <div class="withdraw-box">
+        <label>
+          Сумма вывода
+          <input id="withdrawAmount" type="number" inputmode="decimal" min="1" step="0.01" placeholder="Например 25">
+        </label>
+        <button class="secondary-btn" id="withdrawBtn" type="button">Создать заявку на вывод</button>
+      </div>
+      <div class="feed" id="incomeFeed"></div>
+    </section>
+
+    <section class="screen" id="shareScreen">
+      <div class="section-head">
+        <h2>Совместное использование</h2>
+        <p>Сгенерируйте личную ссылку и получайте бонусы с 3 уровней команды.</p>
+      </div>
+      <div class="ref-card">
+        <input id="refLink" readonly value="https://crypto-invest.app/start?ref=blago-user">
+        <button class="primary-btn" id="copyRef" type="button">Скопировать</button>
+      </div>
+      <div class="bonus-list">
+        <div><strong>10%</strong><span>за пополнение 1 уровня</span></div>
+        <div><strong>2.5%</strong><span>за пополнение 2 уровня</span></div>
+        <div><strong>1%</strong><span>за пополнение 3 уровня</span></div>
+      </div>
+    </section>
+
+    <section class="screen" id="profileScreen">
+      <div class="profile-card">
+        <div class="avatar" id="profileAvatar">CI</div>
+        <div>
+          <h2 id="profileName">Профиль</h2>
+          <p id="profilePhone">Телефон не указан</p>
+        </div>
+      </div>
+
+      <form class="wallet-form" id="walletForm">
+        <h2>Адрес вывода</h2>
+        <label>
+          Сеть
+          <select name="network" id="walletNetwork">
+            <option value="USDT TRC20">USDT TRC20</option>
+            <option value="USDT Polygon POS">USDT Polygon POS</option>
+            <option value="LTC">LTC</option>
+            <option value="BTC">BTC</option>
+          </select>
+        </label>
+        <label>
+          Ваша ссылка / адрес
+          <input name="address" id="walletAddress" maxlength="160" placeholder="Вставьте адрес кошелька">
+        </label>
+        <button class="primary-btn" type="submit">Сохранить адрес</button>
+      </form>
+
+      <div class="wallet-list" id="walletList"></div>
+
+      <div class="menu-list">
+        <button type="button" data-panel="withdrawals">Общий доход и выводы</button>
+        <button type="button" data-panel="details">Детали дохода</button>
+        <button type="button" data-panel="team">Размер команды</button>
+        <button type="button" data-panel="report">Отчет команды</button>
+        <button type="button" id="logoutButton">Выйти</button>
+      </div>
+      <div class="panel" id="profilePanel"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Навигация">
+    <button class="is-active" data-nav="home" type="button">Главная</button>
+    <button data-nav="levels" type="button">Уровни</button>
+    <button data-nav="blago" type="button">BLAGO</button>
+    <button data-nav="income" type="button">Доход</button>
+    <button data-nav="profile" type="button">Профиль</button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
