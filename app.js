@@ -36,6 +36,7 @@ const defaultState = {
   cycleReady: false,
   lastStartDate: "",
   wallets: {},
+  withdrawalRequests: [],
   referralReports: [],
   history: [
     { title: "Добро пожаловать", text: "Зарегистрируйтесь, добавьте адрес вывода и выберите первый уровень." }
@@ -72,7 +73,9 @@ const els = {
   totalIncome: document.querySelector("#totalIncome"),
   pendingIncome: document.querySelector("#pendingIncome"),
   incomeFeed: document.querySelector("#incomeFeed"),
+  withdrawNetwork: document.querySelector("#withdrawNetwork"),
   withdrawAmount: document.querySelector("#withdrawAmount"),
+  withdrawList: document.querySelector("#withdrawList"),
   withdrawBtn: document.querySelector("#withdrawBtn"),
   copyRef: document.querySelector("#copyRef"),
   refLink: document.querySelector("#refLink"),
@@ -124,6 +127,7 @@ function persistCurrentAccount() {
     cycleReady: state.cycleReady,
     lastStartDate: state.lastStartDate,
     wallets: state.wallets || {},
+    withdrawalRequests: state.withdrawalRequests || [],
     history: state.history || [],
     referralReports: state.referralReports || [],
     pendingPayment: state.pendingPayment || null
@@ -140,6 +144,7 @@ function loadAccountApp(phone) {
   state.cycleReady = Boolean(app.cycleReady);
   state.lastStartDate = app.lastStartDate || "";
   state.wallets = app.wallets || {};
+  state.withdrawalRequests = app.withdrawalRequests || [];
   state.history = app.history || [
     { title: "Добро пожаловать", text: "Аккаунт открыт. Уровень не выдан, выберите пакет самостоятельно." }
   ];
@@ -157,6 +162,7 @@ function appSnapshot() {
     cycleReady: state.cycleReady,
     lastStartDate: state.lastStartDate,
     wallets: state.wallets || {},
+    withdrawalRequests: state.withdrawalRequests || [],
     history: state.history || [],
     referralReports: state.referralReports || [],
     pendingPayment: state.pendingPayment || null
@@ -409,8 +415,9 @@ function activatePaidLevel(level, note) {
 function openPaymentModal(level) {
   selectedPaymentLevel = level;
   els.paymentLevelText.textContent = `${level.title}: к оплате ${money(level.price)}. Выберите монету и сеть.`;
-  els.paymentResult.innerHTML = "";
+  els.paymentResult.innerHTML = "<span>После выбора монеты откроется ссылка на оплату. Если ссылка не появилась, значит backend Render ещё не настроен как Web Service.</span>";
   els.paymentModal.hidden = false;
+  toast("Выберите монету для оплаты");
 }
 
 function closePaymentModal() {
@@ -434,9 +441,12 @@ async function createCryptoPayment(currency, label) {
         userName: user?.name || ""
       })
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || "Не удалось создать платеж");
+      throw new Error(data.error || "Оплата пока не настроена на сервере. Проверьте Render Web Service и переменные NOWPayments.");
+    }
+    if (!data.paymentUrl) {
+      throw new Error("NOWPayments не вернул ссылку оплаты. Проверьте API key и валюту.");
     }
     els.paymentResult.innerHTML = `
       <strong>Платеж создан: ${escapeHtml(label)}</strong>
@@ -452,7 +462,8 @@ async function createCryptoPayment(currency, label) {
     };
     saveState();
   } catch (error) {
-    els.paymentResult.textContent = error.message;
+    els.paymentResult.innerHTML = `<strong>Платеж не создан</strong><span>${escapeHtml(error.message)}</span>`;
+    toast("Платеж не создан");
   }
 }
 
@@ -611,9 +622,10 @@ function claimIncome() {
 }
 
 function withdraw() {
-  const savedWallets = Object.values(state.wallets || {}).filter(Boolean);
-  if (!savedWallets.length) {
-    toast("Добавьте адрес вывода в профиле");
+  const network = els.withdrawNetwork.value;
+  const address = state.wallets?.[network] || "";
+  if (!address) {
+    toast(`Добавьте адрес ${network} в профиле`);
     setScreen("profile");
     return;
   }
@@ -630,23 +642,50 @@ function withdraw() {
     toast("Сумма больше баланса");
     return;
   }
+  const request = {
+    id: `wd-${Date.now()}`,
+    amount,
+    network,
+    address,
+    status: "В обработке",
+    createdAt: new Date().toLocaleString("ru-RU")
+  };
   state.balance = Number((state.balance - amount).toFixed(2));
-  addHistory("Заявка на вывод", `${money(amount)} отправлены в обработку на сохраненный адрес.`);
+  state.withdrawalRequests = [request, ...(state.withdrawalRequests || [])].slice(0, 30);
+  addHistory("Заявка на вывод отправлена", `${money(amount)} на ${network} отправлены в обработку. Адрес: ${address}`);
   els.withdrawAmount.value = "";
   saveState();
   render();
-  toast("Заявка создана");
+  toast("Заявка на вывод отправлена и находится в обработке");
 }
 
 function renderIncome() {
   els.totalIncome.textContent = money(state.totalIncome);
   els.pendingIncome.textContent = money(state.pending);
+  renderWithdrawals();
   els.incomeFeed.innerHTML = "";
   state.history.forEach((item) => {
     const row = document.createElement("article");
     row.className = "feed-item";
     row.innerHTML = `<strong>${item.title}</strong><p>${item.text}</p>`;
     els.incomeFeed.append(row);
+  });
+}
+
+function renderWithdrawals() {
+  els.withdrawList.innerHTML = "";
+  const requests = state.withdrawalRequests || [];
+  if (!requests.length) return;
+  requests.forEach((request) => {
+    const item = document.createElement("article");
+    item.className = "withdraw-item";
+    item.innerHTML = `
+      <span class="status-pill">${escapeHtml(request.status)}</span>
+      <strong>${money(request.amount)} · ${escapeHtml(request.network)}</strong>
+      <span>${escapeHtml(request.address)}</span>
+      <span>${escapeHtml(request.createdAt)}</span>
+    `;
+    els.withdrawList.append(item);
   });
 }
 
