@@ -378,7 +378,6 @@ function renderLevels() {
   levels.forEach((level) => {
     const locked = state.activeLevel > level.id;
     const active = state.activeLevel === level.id;
-    const affordable = state.balance >= level.price;
     const card = document.createElement("article");
     card.className = `level-card${locked ? " is-locked" : ""}${active ? " is-active" : ""}`;
     card.innerHTML = `
@@ -386,10 +385,10 @@ function renderLevels() {
         <strong>${level.title}</strong>
         <span>Стоимость ${money(level.price)}</span>
         <small>Ежедневный доход ${money(level.daily)}</small>
-        <small>${affordable || active || locked ? "" : `Не хватает ${money(level.price - state.balance)}`}</small>
+        <small>${active || locked ? "" : "Покупка только через крипто-оплату"}</small>
       </div>
       <button type="button" ${locked || active ? "disabled" : ""}>
-        ${locked ? "Закрыт" : active ? "Куплен" : affordable ? "Купить" : "Оплатить"}
+        ${locked ? "Закрыт" : active ? "Куплен" : "Оплатить"}
       </button>
     `;
     card.querySelector("button").addEventListener("click", () => buyLevel(level));
@@ -398,13 +397,7 @@ function renderLevels() {
 }
 
 function buyLevel(level) {
-  if (state.balance < level.price) {
-    openPaymentModal(level);
-    return;
-  }
-  state.balance = Number((state.balance - level.price).toFixed(2));
-  activatePaidLevel(level, `Баланс списан: ${money(level.price)}.`);
-  toast(`${level.title} активирован`);
+  openPaymentModal(level);
 }
 
 function activatePaidLevel(level, note) {
