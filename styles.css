@@ -169,7 +169,8 @@ body.auth-locked .bottom-nav {
 .auth-form select,
 .wallet-form input,
 .wallet-form select,
-.withdraw-box input {
+.withdraw-box input,
+.withdraw-box select {
   width: 100%;
   min-height: 46px;
   border: 1px solid var(--line);
@@ -301,6 +302,7 @@ h2 {
 .profile-card,
 .wallet-form,
 .wallet-item,
+.withdraw-item,
 .menu-list,
 .panel,
 .feed-item {
@@ -602,26 +604,45 @@ h2 {
   margin-bottom: 0;
 }
 
-.wallet-list {
+.wallet-list,
+.withdraw-list {
   display: grid;
   gap: 8px;
   margin-top: 12px;
 }
 
-.wallet-item {
+.withdraw-list {
+  margin-bottom: 12px;
+}
+
+.wallet-item,
+.withdraw-item {
   display: grid;
   gap: 5px;
   padding: 12px;
   overflow-wrap: anywhere;
 }
 
-.wallet-item strong {
+.wallet-item strong,
+.withdraw-item strong {
   color: var(--text);
 }
 
-.wallet-item span {
+.wallet-item span,
+.withdraw-item span {
   color: var(--muted);
   font-size: 13px;
+}
+
+.status-pill {
+  display: inline-flex;
+  width: max-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface-2));
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .menu-list {
