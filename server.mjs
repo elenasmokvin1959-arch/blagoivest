@@ -67,6 +67,7 @@ function defaultAppState(name) {
     cycleReady: false,
     lastStartDate: "",
     wallets: {},
+    withdrawalRequests: [],
     referralReports: [],
     pendingPayment: null,
     history: [
