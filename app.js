@@ -44,6 +44,7 @@ const defaultState = {
 
 let authMode = "login";
 let state = loadState();
+let cloudSaveTimer = null;
 
 const screens = {
   home: document.querySelector("#homeScreen"),
@@ -105,6 +106,7 @@ function loadState() {
 function saveState() {
   persistCurrentAccount();
   localStorage.setItem(stateKey, JSON.stringify(state));
+  queueCloudSave();
 }
 
 function currentUser() {
@@ -143,6 +145,59 @@ function loadAccountApp(phone) {
   ];
   state.referralReports = app.referralReports || [];
   state.pendingPayment = app.pendingPayment || null;
+}
+
+function appSnapshot() {
+  return {
+    balance: state.balance,
+    pending: state.pending,
+    totalIncome: state.totalIncome,
+    activeLevel: state.activeLevel,
+    cycleEndsAt: state.cycleEndsAt,
+    cycleReady: state.cycleReady,
+    lastStartDate: state.lastStartDate,
+    wallets: state.wallets || {},
+    history: state.history || [],
+    referralReports: state.referralReports || [],
+    pendingPayment: state.pendingPayment || null
+  };
+}
+
+function hydrateAccount(user, app) {
+  if (!user?.phone) return;
+  state.accounts[user.phone] = {
+    name: user.name,
+    phone: user.phone,
+    countryCode: user.countryCode,
+    sponsor: user.sponsor || "",
+    createdAt: user.createdAt,
+    app: app || user.app || {}
+  };
+}
+
+function queueCloudSave() {
+  if (!state.currentPhone) return;
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = window.setTimeout(() => {
+    fetch("/api/user-state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: state.currentPhone, app: appSnapshot() })
+    }).catch(() => {});
+  }, 450);
+}
+
+async function apiPost(path, payload) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Ошибка сервера");
+  }
+  return data;
 }
 
 function money(value) {
@@ -219,6 +274,15 @@ function setLoggedIn(phone) {
   render();
 }
 
+function setLoggedInFromApi(user, app) {
+  hydrateAccount(user, app);
+  state.currentPhone = user.phone;
+  loadAccountApp(user.phone);
+  localStorage.setItem(stateKey, JSON.stringify(state));
+  document.body.classList.remove("auth-locked");
+  render();
+}
+
 function logout() {
   state.currentPhone = "";
   saveState();
@@ -226,7 +290,7 @@ function logout() {
   setScreen("home");
 }
 
-function handleAuth(event) {
+async function handleAuth(event) {
   event.preventDefault();
   const form = new FormData(els.authForm);
   const name = String(form.get("name") || "").trim();
@@ -258,40 +322,29 @@ function handleAuth(event) {
       return;
     }
 
-    state.accounts[phone] = {
-      name,
-      phone,
-      countryCode,
-      password,
-      sponsor: state.pendingRef && state.pendingRef !== phone ? state.pendingRef : "",
-      createdAt: new Date().toISOString()
-    };
-    state.balance = 0;
-    state.pending = 0;
-    state.totalIncome = 0;
-    state.activeLevel = 0;
-    state.cycleEndsAt = 0;
-    state.cycleReady = false;
-    state.lastStartDate = "";
-    state.wallets = {};
-    state.referralReports = [];
-    state.pendingPayment = null;
-    state.history = [
-      { title: "Регистрация", text: `${name}, аккаунт создан. Уровень не выдан, выберите пакет самостоятельно.` }
-    ];
-    setLoggedIn(phone);
-    toast("Регистрация завершена");
+    try {
+      const data = await apiPost("/api/auth/register", {
+        name,
+        countryCode,
+        phone,
+        password,
+        sponsor: state.pendingRef && state.pendingRef !== phone ? state.pendingRef : ""
+      });
+      setLoggedInFromApi(data.user, data.app);
+      toast("Регистрация завершена");
+    } catch (error) {
+      els.authError.textContent = error.message;
+    }
     return;
   }
 
-  const account = state.accounts[phone];
-  if (!account || account.password !== password) {
-    els.authError.textContent = "Неверный телефон или пароль.";
-    return;
+  try {
+    const data = await apiPost("/api/auth/login", { phone, password });
+    setLoggedInFromApi(data.user, data.app);
+    toast("Вы вошли в аккаунт");
+  } catch (error) {
+    els.authError.textContent = error.message;
   }
-
-  setLoggedIn(phone);
-  toast("Вы вошли в аккаунт");
 }
 
 function setScreen(name) {
@@ -445,6 +498,11 @@ function referralChainFor(phone) {
 function applyReferralBonuses(amount) {
   const buyer = currentUser();
   if (!buyer) return;
+  fetch("/api/referral-bonus", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ buyerPhone: buyer.phone, amount })
+  }).catch(() => {});
   const percents = [10, 2.5, 1];
   referralChainFor(buyer.phone).forEach((sponsorPhone, index) => {
     const sponsor = state.accounts[sponsorPhone];
@@ -657,6 +715,32 @@ function renderProfilePanel(type = "team") {
     report: `<strong>Отчет команды</strong><br>${reportHtml}<br><br>Проценты: 10% от 1 линии, 2.5% от 2 линии, 1% от 3 линии.`
   };
   els.profilePanel.innerHTML = content[type] || content.team;
+  refreshTeamPanel(type);
+}
+
+async function refreshTeamPanel(type) {
+  if (!state.currentPhone || !["team", "report"].includes(type)) return;
+  try {
+    const response = await fetch(`/api/team/${encodeURIComponent(state.currentPhone)}`);
+    const data = await response.json();
+    if (!response.ok) return;
+    if (type === "team") {
+      const html = data.lines.map((line, index) => {
+        const names = line.length
+          ? line.map((account) => `${escapeHtml(account.name)} · ${escapeHtml(account.phone)}`).join("<br>")
+          : "Пока нет партнеров";
+        return `<strong>${index + 1} уровень: ${line.length}</strong><br>${names}`;
+      }).join("<br><br>");
+      els.profilePanel.innerHTML = `<strong>Размер команды</strong><br>${html}`;
+    }
+    if (type === "report") {
+      const reports = data.reports || [];
+      const html = reports.length
+        ? reports.map((item) => `<strong>${money(item.amount)} · ${item.percent}% · ${item.level} линия</strong><br>${escapeHtml(item.fromName)} · ${escapeHtml(item.from)}<br>${escapeHtml(item.date)}`).join("<br><br>")
+        : "Пока нет реферальных начислений.";
+      els.profilePanel.innerHTML = `<strong>Отчет команды</strong><br>${html}<br><br>Проценты: 10% от 1 линии, 2.5% от 2 линии, 1% от 3 линии.`;
+    }
+  } catch {}
 }
 
 function getTeamLines(phone) {
