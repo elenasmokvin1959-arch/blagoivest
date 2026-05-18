@@ -201,6 +201,24 @@
     <button data-nav="profile" type="button">Профиль</button>
   </nav>
 
+  <section class="payment-modal" id="paymentModal" aria-labelledby="paymentTitle" hidden>
+    <div class="payment-card">
+      <button class="icon-btn payment-close" id="paymentClose" type="button" aria-label="Закрыть">×</button>
+      <p class="eyebrow">NOWPayments</p>
+      <h2 id="paymentTitle">Оплата уровня</h2>
+      <p id="paymentLevelText">Выберите монету и сеть для оплаты.</p>
+
+      <div class="payment-options">
+        <button type="button" data-pay-currency="usdttrc20" data-pay-label="USDT TRC20">USDT TRC20</button>
+        <button type="button" data-pay-currency="usdtmatic" data-pay-label="USDT Polygon POS">USDT Polygon POS</button>
+        <button type="button" data-pay-currency="ltc" data-pay-label="LTC">LTC</button>
+        <button type="button" data-pay-currency="btc" data-pay-label="BTC">BTC</button>
+      </div>
+
+      <div class="payment-result" id="paymentResult"></div>
+    </div>
+  </section>
+
   <div class="toast" id="toast"></div>
   <script src="app.js"></script>
 </body>
