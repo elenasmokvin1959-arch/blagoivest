@@ -138,7 +138,11 @@ async function createUser({ name, phone, countryCode, password, sponsor }) {
       app_state: defaultAppState(name)
     })
   });
-  return rows?.[0];
+  const created = Array.isArray(rows) ? rows[0] : rows;
+  if (!created?.phone) {
+    throw new Error("Supabase did not return created account. Check table schema and service key.");
+  }
+  return created;
 }
 
 async function updateUserState(phone, appState) {
@@ -255,6 +259,10 @@ async function handleRegister(req, res) {
   }
 
   const user = await createUser({ name, phone, countryCode, password, sponsor });
+  if (!user?.phone) {
+    sendJson(res, 500, { error: "Account was not created in database" });
+    return;
+  }
   sendJson(res, 200, { user: publicUser(user), app: user.app_state || {} });
 }
 
@@ -266,6 +274,10 @@ async function handleLogin(req, res) {
 
   if (!user || !verifyPassword(password, user.password_salt, user.password_hash)) {
     sendJson(res, 401, { error: "Invalid phone or password" });
+    return;
+  }
+  if (!publicUser(user)?.phone) {
+    sendJson(res, 500, { error: "Account data is invalid in database" });
     return;
   }
 
