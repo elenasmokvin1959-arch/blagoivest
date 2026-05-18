@@ -85,8 +85,14 @@ const els = {
   profilePanel: document.querySelector("#profilePanel"),
   logoutButton: document.querySelector("#logoutButton"),
   toast: document.querySelector("#toast"),
-  themeToggle: document.querySelector("#themeToggle")
+  themeToggle: document.querySelector("#themeToggle"),
+  paymentModal: document.querySelector("#paymentModal"),
+  paymentClose: document.querySelector("#paymentClose"),
+  paymentLevelText: document.querySelector("#paymentLevelText"),
+  paymentResult: document.querySelector("#paymentResult")
 };
+
+let selectedPaymentLevel = null;
 
 function loadState() {
   try {
@@ -117,7 +123,8 @@ function persistCurrentAccount() {
     lastStartDate: state.lastStartDate,
     wallets: state.wallets || {},
     history: state.history || [],
-    referralReports: state.referralReports || []
+    referralReports: state.referralReports || [],
+    pendingPayment: state.pendingPayment || null
   };
 }
 
@@ -135,6 +142,7 @@ function loadAccountApp(phone) {
     { title: "Добро пожаловать", text: "Аккаунт открыт. Уровень не выдан, выберите пакет самостоятельно." }
   ];
   state.referralReports = app.referralReports || [];
+  state.pendingPayment = app.pendingPayment || null;
 }
 
 function money(value) {
@@ -267,6 +275,7 @@ function handleAuth(event) {
     state.lastStartDate = "";
     state.wallets = {};
     state.referralReports = [];
+    state.pendingPayment = null;
     state.history = [
       { title: "Регистрация", text: `${name}, аккаунт создан. Уровень не выдан, выберите пакет самостоятельно.` }
     ];
@@ -317,8 +326,8 @@ function renderLevels() {
         <small>Ежедневный доход ${money(level.daily)}</small>
         <small>${affordable || active || locked ? "" : `Не хватает ${money(level.price - state.balance)}`}</small>
       </div>
-      <button type="button" ${locked || active || !affordable ? "disabled" : ""}>
-        ${locked ? "Закрыт" : active ? "Куплен" : affordable ? "Купить" : "Нет средств"}
+      <button type="button" ${locked || active ? "disabled" : ""}>
+        ${locked ? "Закрыт" : active ? "Куплен" : affordable ? "Купить" : "Оплатить"}
       </button>
     `;
     card.querySelector("button").addEventListener("click", () => buyLevel(level));
@@ -328,16 +337,98 @@ function renderLevels() {
 
 function buyLevel(level) {
   if (state.balance < level.price) {
-    toast(`Недостаточно средств: нужно ${money(level.price)}`);
+    openPaymentModal(level);
     return;
   }
   state.balance = Number((state.balance - level.price).toFixed(2));
+  activatePaidLevel(level, `Баланс списан: ${money(level.price)}.`);
+  toast(`${level.title} активирован`);
+}
+
+function activatePaidLevel(level, note) {
   state.activeLevel = level.id;
-  addHistory("Покупка уровня", `${level.title} приобретен за ${money(level.price)}. Предыдущие уровни закрыты, следующие доступны.`);
+  addHistory("Покупка уровня", `${level.title} приобретен за ${money(level.price)}. ${note} Предыдущие уровни закрыты, следующие доступны.`);
   applyReferralBonuses(level.price);
   saveState();
   render();
-  toast(`${level.title} активирован`);
+}
+
+function openPaymentModal(level) {
+  selectedPaymentLevel = level;
+  els.paymentLevelText.textContent = `${level.title}: к оплате ${money(level.price)}. Выберите монету и сеть.`;
+  els.paymentResult.innerHTML = "";
+  els.paymentModal.hidden = false;
+}
+
+function closePaymentModal() {
+  els.paymentModal.hidden = true;
+  selectedPaymentLevel = null;
+}
+
+async function createCryptoPayment(currency, label) {
+  if (!selectedPaymentLevel) return;
+  const user = currentUser();
+  els.paymentResult.textContent = "Создаем платеж...";
+  try {
+    const response = await fetch("/api/nowpayments/create-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        levelId: selectedPaymentLevel.id,
+        payCurrency: currency,
+        payLabel: label,
+        userPhone: user?.phone || "",
+        userName: user?.name || ""
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Не удалось создать платеж");
+    }
+    els.paymentResult.innerHTML = `
+      <strong>Платеж создан: ${escapeHtml(label)}</strong>
+      <span>Сумма уровня: ${money(selectedPaymentLevel.price)}</span>
+      <a href="${escapeHtml(data.paymentUrl)}" target="_blank" rel="noreferrer">Открыть оплату</a>
+      <button class="secondary-btn" type="button" data-check-payment="${escapeHtml(data.paymentId)}">Проверить оплату</button>
+    `;
+    state.pendingPayment = {
+      paymentId: data.paymentId,
+      levelId: selectedPaymentLevel.id,
+      amount: selectedPaymentLevel.price,
+      payLabel: label
+    };
+    saveState();
+  } catch (error) {
+    els.paymentResult.textContent = error.message;
+  }
+}
+
+async function checkCryptoPayment(paymentId) {
+  const pending = state.pendingPayment;
+  if (!pending || pending.paymentId !== paymentId) {
+    toast("Платеж не найден");
+    return;
+  }
+  els.paymentResult.append(" Проверяем статус...");
+  try {
+    const response = await fetch(`/api/nowpayments/payment-status/${encodeURIComponent(paymentId)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Не удалось проверить оплату");
+    const paidStatuses = ["confirmed", "finished"];
+    if (!paidStatuses.includes(data.paymentStatus)) {
+      toast(`Статус: ${data.paymentStatus || "ожидает оплаты"}`);
+      return;
+    }
+    const level = levels.find((item) => item.id === pending.levelId);
+    if (!level) throw new Error("Уровень не найден");
+    activatePaidLevel(level, `Оплата NOWPayments подтверждена. Валюта: ${pending.payLabel}.`);
+    state.pendingPayment = null;
+    saveState();
+    closePaymentModal();
+    toast("Оплата подтверждена");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 function referralChainFor(phone) {
@@ -608,6 +699,17 @@ els.claimIncome.addEventListener("click", claimIncome);
 els.withdrawBtn.addEventListener("click", withdraw);
 els.walletForm.addEventListener("submit", saveWallet);
 els.logoutButton.addEventListener("click", logout);
+els.paymentClose.addEventListener("click", closePaymentModal);
+els.paymentModal.addEventListener("click", (event) => {
+  if (event.target === els.paymentModal) closePaymentModal();
+});
+document.querySelectorAll("[data-pay-currency]").forEach((button) => {
+  button.addEventListener("click", () => createCryptoPayment(button.dataset.payCurrency, button.dataset.payLabel));
+});
+els.paymentResult.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-check-payment]");
+  if (button) checkCryptoPayment(button.dataset.checkPayment);
+});
 els.copyRef.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(els.refLink.value);
