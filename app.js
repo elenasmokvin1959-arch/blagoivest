@@ -281,6 +281,9 @@ function setLoggedIn(phone) {
 }
 
 function setLoggedInFromApi(user, app) {
+  if (!user || !user.phone) {
+    throw new Error("Сервер не вернул данные аккаунта. Проверьте Supabase и Render Environment.");
+  }
   hydrateAccount(user, app);
   state.currentPhone = user.phone;
   loadAccountApp(user.phone);
